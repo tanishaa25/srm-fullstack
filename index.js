@@ -8,9 +8,9 @@ app.use(express.json());
 app.use(express.static('public')); // serve frontend
 
 // ── YOUR DETAILS ──────────────────────────────────────────
-const USER_ID = "yourname_ddmmyyyy";        // e.g. "rahulkumar_15032004"
-const EMAIL_ID = "your@email.com";          // college email
-const ROLL_NUMBER = "RA2211003010001";       // your roll number
+const USER_ID = "tanisha-25102004";
+const EMAIL_ID = "ta8721@srmist.edu.in";
+const ROLL_NUMBER = "RA2311026010038";
 // ─────────────────────────────────────────────────────────
 
 // Validate one entry: must be X->Y, single uppercase letters, not self-loop
