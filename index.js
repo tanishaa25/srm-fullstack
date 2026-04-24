@@ -6,6 +6,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+app.get("/", (req, res) => {
+  res.sendFile(__dirname + "/public/index.html");
+});
 
 const USER_ID = "tanisha-25102004";
 const EMAIL_ID = "ta8721@srmist.edu.in";
