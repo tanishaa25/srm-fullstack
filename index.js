@@ -5,44 +5,43 @@ const path = require('path');
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public')); // serve frontend
+app.use(express.static('public'));
 
-// ── YOUR DETAILS ──────────────────────────────────────────
 const USER_ID = "tanisha-25102004";
 const EMAIL_ID = "ta8721@srmist.edu.in";
 const ROLL_NUMBER = "RA2311026010038";
-// ─────────────────────────────────────────────────────────
 
-// Validate one entry: must be X->Y, single uppercase letters, not self-loop
+
+
 function isValid(entry) {
   return /^[A-Z]->[A-Z]$/.test(entry);
 }
 
-// Build trees and detect cycles from valid edges
+
 function buildHierarchies(edges) {
-  // Track children and parents
-  const children = {};  // parent -> [children]
-  const parents = {};   // child -> parent (first parent wins)
+
+  const children = {};
+  const parents = {};
 
   for (const edge of edges) {
     const [parent, child] = edge.split('->');
     if (!children[parent]) children[parent] = [];
-    // Diamond rule: first parent edge wins
+
     if (parents[child] === undefined) {
       parents[child] = parent;
       children[parent].push(child);
     }
-    // Ensure parent node exists in children map
+
     if (!children[child]) children[child] = [];
   }
 
-  // All nodes
+
   const allNodes = new Set([...Object.keys(children), ...Object.keys(parents)]);
 
-  // Find roots: nodes that are never a child
+
   const roots = [...allNodes].filter(n => parents[n] === undefined);
 
-  // Group nodes into connected components
+
   function getComponent(start) {
     const visited = new Set();
     const queue = [start];
@@ -51,7 +50,7 @@ function buildHierarchies(edges) {
       if (visited.has(node)) continue;
       visited.add(node);
       (children[node] || []).forEach(c => queue.push(c));
-      // also walk up
+
       if (parents[node]) queue.push(parents[node]);
     }
     return visited;
@@ -60,7 +59,6 @@ function buildHierarchies(edges) {
   const assigned = new Set();
   const components = [];
 
-  // Assign each root its component
   for (const root of roots.sort()) {
     if (assigned.has(root)) continue;
     const comp = getComponent(root);
@@ -68,14 +66,14 @@ function buildHierarchies(edges) {
     components.push({ root, nodes: comp });
   }
 
-  // Nodes with no root (pure cycles)
+
   const unassigned = [...allNodes].filter(n => !assigned.has(n));
   if (unassigned.length) {
-    // Group them by connectivity
+
     while (unassigned.length) {
       const start = unassigned.sort()[0];
       const comp = getComponent(start);
-      // lexicographically smallest node as root
+
       const root = [...comp].sort()[0];
       comp.forEach(n => {
         const idx = unassigned.indexOf(n);
@@ -86,7 +84,7 @@ function buildHierarchies(edges) {
     }
   }
 
-  // Detect cycle in a component using DFS
+
   function hasCycle(root, comp) {
     const visited = new Set();
     const stack = new Set();
@@ -107,7 +105,7 @@ function buildHierarchies(edges) {
     return dfs(root);
   }
 
-  // Build nested tree object recursively
+
   function buildTree(node, visited = new Set()) {
     if (visited.has(node)) return {};
     visited.add(node);
@@ -118,7 +116,6 @@ function buildHierarchies(edges) {
     return obj;
   }
 
-  // Calculate depth (longest root-to-leaf path, counting nodes)
   function calcDepth(node, visited = new Set()) {
     if (visited.has(node)) return 0;
     visited.add(node);
@@ -154,15 +151,13 @@ app.post('/bfhl', (req, res) => {
   const validEdges = [];
 
   for (let entry of raw) {
-    entry = entry.trim(); // trim whitespace first
+    entry = entry.trim();
 
     if (!isValid(entry)) {
       invalid_entries.push(entry);
       continue;
     }
 
-    // Self-loop already caught by regex (A->A fails [A-Z]->[A-Z] since same letter... 
-    // Actually regex allows it, so check explicitly:
     const [p, c] = entry.split('->');
     if (p === c) { invalid_entries.push(entry); continue; }
 
@@ -176,7 +171,7 @@ app.post('/bfhl', (req, res) => {
 
   const hierarchies = buildHierarchies(validEdges);
 
-  // Summary
+
   const nonCyclic = hierarchies.filter(h => !h.has_cycle);
   const cyclic = hierarchies.filter(h => h.has_cycle);
 
@@ -184,7 +179,7 @@ app.post('/bfhl', (req, res) => {
   if (nonCyclic.length) {
     const sorted = nonCyclic.sort((a, b) => {
       if (b.depth !== a.depth) return b.depth - a.depth;
-      return a.root.localeCompare(b.root); // tiebreak: lex smaller
+      return a.root.localeCompare(b.root);
     });
     largest_tree_root = sorted[0].root;
   }
