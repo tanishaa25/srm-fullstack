@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>BFHL Tree Visualizer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; padding: 2rem; }
+    h1 { text-align: center; font-size: 1.8rem; margin-bottom: 0.3rem; color: #38bdf8; }
+    p.sub { text-align: center; color: #94a3b8; margin-bottom: 1.5rem; font-size: 0.9rem; }
+    .card { background: #1e293b; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.2rem; border: 1px solid #334155; }
+    textarea { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; padding: 0.8rem; font-size: 1rem; resize: vertical; min-height: 120px; }
+    button { margin-top: 1rem; width: 100%; padding: 0.75rem; background: #38bdf8; border: none; border-radius: 8px; color: #0f172a; font-weight: bold; font-size: 1rem; cursor: pointer; transition: background 0.2s; }
+    button:hover { background: #7dd3fc; }
+    .error { color: #f87171; background: #1e293b; border: 1px solid #f87171; border-radius: 8px; padding: 1rem; margin-top: 1rem; }
+    .section-title { font-size: 1rem; font-weight: 600; color: #38bdf8; margin-bottom: 0.7rem; }
+    .badge { display: inline-block; padding: 0.2rem 0.7rem; border-radius: 9999px; font-size: 0.78rem; font-weight: bold; margin-right: 0.4rem; }
+    .badge-cycle { background: #7f1d1d; color: #fca5a5; }
+    .badge-tree { background: #14532d; color: #86efac; }
+    .tree-box { background: #0f172a; border-radius: 8px; padding: 1rem; font-family: monospace; font-size: 0.88rem; overflow-x: auto; white-space: pre; color: #a5f3fc; margin-top: 0.5rem; }
+    .tag { display: inline-block; background: #334155; border-radius: 6px; padding: 0.2rem 0.6rem; margin: 0.2rem; font-size: 0.85rem; }
+    .tag-invalid { background: #450a0a; color: #fca5a5; }
+    .tag-dup { background: #431407; color: #fdba74; }
+    .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .summary-item { background: #0f172a; border-radius: 8px; padding: 1rem; text-align: center; }
+    .summary-item .val { font-size: 1.8rem; font-weight: bold; color: #38bdf8; }
+    .summary-item .lbl { font-size: 0.75rem; color: #94a3b8; margin-top: 0.2rem; }
+    .loader { text-align: center; color: #38bdf8; padding: 1rem; }
+    #output { display: none; }
+  </style>
+</head>
+<body>
+  <h1>🌳 BFHL Tree Visualizer</h1>
+  <p class="sub">SRM Full Stack Engineering Challenge</p>
+
+  <div class="card">
+    <div class="section-title">Enter Node Edges (comma or newline separated)</div>
+    <textarea id="input" placeholder='e.g. A->B, A->C, B->D, X->Y, Y->Z, Z->X, hello, 1->2'></textarea>
+    <button onclick="submit()">🚀 Submit</button>
+  </div>
+
+  <div id="error" class="error" style="display:none"></div>
+  <div id="loader" class="loader" style="display:none">Processing...</div>
+  <div id="output"></div>
+
+<script>
+  // Change this to your deployed backend URL when hosting!
+  const API_URL = window.location.origin + '/bfhl';
+
+  function renderTree(obj, indent = 0) {
+    let out = '';
+    for (const [key, val] of Object.entries(obj)) {
+      out += '  '.repeat(indent) + '📦 ' + key + '\n';
+      out += renderTree(val, indent + 1);
+    }
+    return out;
+  }
+
+  async function submit() {
+    const raw = document.getElementById('input').value;
+    const data = raw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+
+    document.getElementById('error').style.display = 'none';
+    document.getElementById('output').style.display = 'none';
+    document.getElementById('loader').style.display = 'block';
+
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data })
+      });
+      if (!res.ok) throw new Error('Server error: ' + res.status);
+      const json = await res.json();
+      renderOutput(json);
+    } catch (e) {
+      document.getElementById('loader').style.display = 'none';
+      const err = document.getElementById('error');
+      err.style.display = 'block';
+      err.textContent = '❌ Error: ' + e.message;
+    }
+  }
+
+  function renderOutput(d) {
+    document.getElementById('loader').style.display = 'none';
+    const out = document.getElementById('output');
+    out.style.display = 'block';
+
+    let html = `
+      <div class="card">
+        <div class="section-title">📊 Summary</div>
+        <div class="summary-grid">
+          <div class="summary-item"><div class="val">${d.summary.total_trees}</div><div class="lbl">Total Trees</div></div>
+          <div class="summary-item"><div class="val">${d.summary.total_cycles}</div><div class="lbl">Total Cycles</div></div>
+          <div class="summary-item"><div class="val">${d.summary.largest_tree_root || '—'}</div><div class="lbl">Largest Tree Root</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">🌲 Hierarchies</div>
+    `;
+
+    for (const h of d.hierarchies) {
+      const badge = h.has_cycle
+        ? '<span class="badge badge-cycle">🔄 CYCLE</span>'
+        : `<span class="badge badge-tree">✅ TREE — depth ${h.depth}</span>`;
+      const treeStr = h.has_cycle ? '(cyclic — no tree structure)' : renderTree(h.tree);
+      html += `
+        <div style="margin-bottom:1.2rem; border-left: 3px solid ${h.has_cycle ? '#ef4444' : '#22c55e'}; padding-left:1rem;">
+          <strong>Root: ${h.root}</strong> ${badge}
+          <div class="tree-box">${treeStr || '(empty)'}</div>
+        </div>
+      `;
+    }
+
+    html += `</div>`;
+
+    if (d.invalid_entries.length) {
+      html += `<div class="card"><div class="section-title">❌ Invalid Entries</div>`;
+      d.invalid_entries.forEach(e => html += `<span class="tag tag-invalid">${e || '(empty)'}</span>`);
+      html += `</div>`;
+    }
+
+    if (d.duplicate_edges.length) {
+      html += `<div class="card"><div class="section-title">⚠️ Duplicate Edges</div>`;
+      d.duplicate_edges.forEach(e => html += `<span class="tag tag-dup">${e}</span>`);
+      html += `</div>`;
+    }
+
+    out.innerHTML = html;
+  }
+</script>
+</body>
+</html>
